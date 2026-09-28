@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 
 type Point = { x: number; y: number };
 export default function CampusCompanion() {
@@ -14,6 +14,8 @@ export default function CampusCompanion() {
   const [actionsReady, setActionsReady] = useState(false);
   const [dragging, setDragging] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLElement>(null);
+  const [panelStyle, setPanelStyle] = useState<CSSProperties>({ visibility: "hidden" });
   const drag = useRef<{ start: Point; origin: Point; moved: boolean } | null>(null);
   const suppressClick = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -26,6 +28,42 @@ export default function CampusCompanion() {
     window.addEventListener("resize", resize);
     return () => { window.removeEventListener("resize", resize); if (timer.current) clearTimeout(timer.current); };
   }, []);
+  useLayoutEffect(() => {
+    if (!open || collapsed) return;
+    function placePanel() {
+      if (!root.current || !panel.current) return;
+      const character = root.current.getBoundingClientRect();
+      const width = panel.current.getBoundingClientRect().width;
+      const margin = 8, gap = 16;
+      const viewportWidth = window.innerWidth, viewportHeight = window.innerHeight;
+      const fit = (value: number, size: number, extent: number) => Math.max(margin, Math.min(value, extent - size - margin));
+      const naturalHeight = panel.current.scrollHeight + 2;
+      let left: number, top: number, maxHeight = viewportHeight - margin * 2;
+      // Keep a separate rectangle for the menu, including after dragging or resizing.
+      if (character.left - gap - width >= margin) {
+        left = character.left - gap - width;
+        top = fit(character.top, Math.min(naturalHeight, maxHeight), viewportHeight);
+      } else if (character.right + gap + width <= viewportWidth - margin) {
+        left = character.right + gap;
+        top = fit(character.top, Math.min(naturalHeight, maxHeight), viewportHeight);
+      } else {
+        left = fit(character.left + character.width / 2 - width / 2, width, viewportWidth);
+        const above = Math.max(0, character.top - gap - margin);
+        const below = Math.max(0, viewportHeight - character.bottom - gap - margin);
+        const useAbove = above >= below;
+        maxHeight = useAbove ? above : below;
+        top = useAbove ? character.top - gap - Math.min(naturalHeight, maxHeight) : character.bottom + gap;
+      }
+      setPanelStyle({ left, top, maxHeight, visibility: "visible" });
+    }
+    placePanel();
+    const observer = new ResizeObserver(placePanel);
+    observer.observe(root.current!);
+    observer.observe(panel.current!);
+    window.addEventListener("resize", placePanel);
+    return () => { observer.disconnect(); window.removeEventListener("resize", placePanel); };
+  }, [open, collapsed, position, message]);
+
   function animate(kind: string, text: string) {
     if (!actionsReady) return;
     if (timer.current) clearTimeout(timer.current);
@@ -69,7 +107,7 @@ export default function CampusCompanion() {
   function stop() { suppressClick.current = drag.current?.moved ?? false; drag.current = null; setDragging(false); }
   if (collapsed) return <button className="companion-restore" onClick={() => { setCollapsed(false); setPosition(null); }} aria-label="展开小晨学长">小晨学长 <span aria-hidden="true">✦</span></button>;
   return <div ref={root} className={`campus-companion ${dragging ? "is-dragging" : ""}`} style={position ? { left: position.x, top: position.y, right: "auto", bottom: "auto" } : undefined}>
-    {open && <section className="companion-panel" aria-label="小晨学长互动" style={position ? { left: Math.max(8 - position.x, Math.min(-110, window.innerWidth - position.x - 268)), ...(position.y < 320 ? { top: 0, bottom: "auto" } : {}) } : undefined}>
+    {open && <section className="companion-panel" aria-label="小晨学长互动" ref={panel} style={panelStyle}>
       <div className="companion-panel-heading"><strong>小晨学长 <small>校园陪伴员</small></strong><button aria-label="关闭互动菜单" onClick={() => setOpen(false)}>×</button></div>
       <p aria-live="polite">{message}</p>
       <div className="companion-actions">

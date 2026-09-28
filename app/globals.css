@@ -282,7 +282,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .companion-name{display:block;margin:2px auto 0;width:max-content;padding:5px 10px;background:#fffffff2;border:1px solid #dce7f1;border-radius:20px;color:#164572;font-size:12px;box-shadow:0 3px 12px #17375e12}
 .companion-name span{font-size:10px;color:#64748b;margin-left:4px}
 .companion-minimize{position:absolute;right:-4px;top:0;z-index:2;width:25px;height:25px;border-radius:50%;border:1px solid #dce7f1;background:white;color:#52677c;cursor:pointer;font-size:18px}
-.companion-panel{position:absolute;bottom:calc(100% + 12px);left:-124px;width:260px;max-width:calc(100vw - 16px);padding:16px;background:#fffffffa;border:1px solid #d8e6f3;border-radius:20px;box-shadow:0 12px 40px #17375e26;z-index:3;user-select:text;backdrop-filter:blur(12px)}
+.companion-panel{position:fixed;overflow-y:auto;overscroll-behavior:contain;width:260px;max-width:calc(100vw - 16px);padding:16px;background:#fffffffa;border:1px solid #d8e6f3;border-radius:20px;box-shadow:0 12px 40px #17375e26;z-index:3;user-select:text;backdrop-filter:blur(12px)}
 .companion-panel-heading{display:flex;align-items:center;justify-content:space-between;color:#143e68;font-size:15px}
 .companion-panel-heading small{display:block;font-size:10px;color:#7890a7;font-weight:400;margin-top:3px}
 .companion-panel-heading button{background:transparent;border:0;font-size:24px;cursor:pointer;color:#64748b;padding:0 4px}
@@ -296,7 +296,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .companion-character.wave{animation:companion-wave 1s ease}
 @keyframes companion-jump{0%,100%{transform:translateY(0)}30%{transform:translateY(-25px) rotate(-5deg)}60%{transform:translateY(0) scale(1.05,.95)}80%{transform:translateY(-10px)}}
 @keyframes companion-wave{0%,100%{transform:rotate(0)}25%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}75%{transform:rotate(-4deg)}}
-@media(max-width:640px){.campus-companion{width:96px;right:14px;bottom:110px}.companion-panel{left:-154px}.companion-name{font-size:11px;padding:4px 7px}.companion-name span{display:none}}
+@media(max-width:640px){.campus-companion{width:96px;right:14px;bottom:110px}.companion-name{font-size:11px;padding:4px 7px}.companion-name span{display:none}}
 @media(prefers-reduced-motion:reduce){.companion-character.jump,.companion-character.wave{animation:none}.companion-character:hover{transform:none}}
 
 .companion-character .companion-sheet-loader{display:none}
