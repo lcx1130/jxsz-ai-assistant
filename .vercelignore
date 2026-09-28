@@ -1,0 +1,12 @@
+.env*
+.git
+.next
+node_modules
+*.tsbuildinfo
+.DS_Store
+public/images/*.prompt.txt
+.edgeone
+.edgeone-output
+.open-next
+.vercel
+tests

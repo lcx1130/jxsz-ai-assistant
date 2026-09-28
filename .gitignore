@@ -1,0 +1,25 @@
+node_modules
+.next
+.env.local
+.DS_Store
+
+.vercel
+.env*
+!.env.example
+*.tsbuildinfo
+
+# Tencent Cloud EdgeOne
+.env
+.edgeone/*
+.tef_dist/*
+  
+.edgeone
+.edgeone-output
+.open-next
+
+# Secrets and local files
+.env
+.env.local
+node_modules/
+.next/
+.DS_Store
