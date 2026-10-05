@@ -154,6 +154,14 @@ function ChatContent() {
               <h1>新生AI助手</h1>
               <span className="status-pill">基于知识库回答</span>
             </div>
+            <button
+              type="button"
+              className="button button-secondary"
+              disabled={loading || historyLoading || pendingHuman}
+              onClick={() => sendMessage("提交反馈")}
+            >
+              提交反馈
+            </button>
             <button type="button" className="button button-human" disabled={loading || historyLoading || pendingHuman} onClick={() => sendMessage("人工客服")}><Icon name="headset" size={18} />{pendingHuman ? "等待人工流程处理" : "我要人工客服"}</button>
             <button type="button" className="button button-secondary" disabled={loading || historyLoading} onClick={newConversation}>新建对话</button>
           </div>
