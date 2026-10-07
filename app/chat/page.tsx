@@ -9,6 +9,7 @@ import { makeUserId } from "../../lib/chat-user";
 import { Suspense, FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../../components/Header";
+import ChatMarkdown from "../../components/ChatMarkdown";
 
 type Source = {
   datasetName?: string;
@@ -110,7 +111,7 @@ function ChatContent() {
           id: data.messageId || crypto.randomUUID(),
           messageId: data.messageId,
           role: "assistant",
-          content: data.answer || (data.humanForm?.awaitingStaff ? "问题已提交，正在等待工作人员回复。" : data.humanForm ? "请填写下方人工服务表单。" : data.status === "paused" ? "流程正在等待人工处理。" : "本次流程已结束，但未提供回复，请重新提问。"),
+          content: data.answer || (data.humanForm?.awaitingStaff ? "问题已提交，正在等待工作人员回复。" : data.humanForm ? "请填写下方表单，或选择取消。" : data.status === "paused" ? "流程正在等待人工处理。" : "本次流程已结束，但未提供回复，请重新提问。"),
           humanForm: data.humanForm,
           workflowRunId: data.workflowRunId,
           status: data.status,
@@ -152,7 +153,7 @@ function ChatContent() {
           <div className="chat-topbar">
             <div>
               <h1>新生AI助手</h1>
-              <span className="status-pill">基于知识库回答</span>
+              <span className="status-pill">校园资料 · 联网查询 · 校园照片</span>
             </div>
             <button
               type="button"
@@ -172,9 +173,9 @@ function ChatContent() {
               <div className="empty-chat">
                 <SchoolEmblem />
                 <h2>今天想了解什么？</h2>
-                <p>你可以问宿舍、校园卡、报到、快递等校园问题。</p>
+                <p>你可以查询校园资料、学习资源、公开通知，或查看食堂和寝室照片。</p>
                 <div className="empty-quick">
-                  {["宿舍是几人寝？", "校园卡怎么办？", "快递在哪里拿？"].map((q) => (
+                  {["有哪些四六级学习资源？", "看看食堂照片", "请联网查询学校的宿舍条件，并注明来源和日期"].map((q) => (
                     <button key={q} onClick={() => sendMessage(q)}>{q}</button>
                   ))}
                 </div>
@@ -185,7 +186,7 @@ function ChatContent() {
               <article className={`message-row ${message.role}`} key={message.id}>
                 {message.role === "assistant" && <SchoolEmblem small />}
                 <div className="message-stack">
-                  <div className={`message-bubble ${message.role}`}>{message.content}</div>
+                  <div className={`message-bubble ${message.role}`}>{message.role === "assistant" ? <ChatMarkdown content={message.content} /> : message.content}</div>
                   {message.humanForm && message.workflowRunId && (
                     <HumanInputForm key={message.humanForm.form_token || message.id} form={message.humanForm} workflowRunId={message.workflowRunId} user={makeUserId()}
                       onResult={(result) => setMessages(previous => previous.map(item => item.id === message.id ? {
@@ -237,11 +238,11 @@ function ChatContent() {
                   }
                 }}
                 disabled={pendingHuman}
-                placeholder={pendingHuman ? "请先完成上方人工服务表单，或新建对话继续咨询" : "输入你的校园问题…"}
+                placeholder={pendingHuman ? "请先完成上方表单，或新建对话继续咨询" : "输入你的校园问题…"}
                 rows={2}
               />
               <div className="composer-bottom">
-                <span className="soft-pill">知识库已连接</span>
+                <span className="soft-pill">重要信息请核对来源和日期</span>
                 <button className="button button-primary" disabled={loading || historyLoading || pendingHuman || !input.trim()} type="submit"><Icon name="send" size={18} />发送</button>
               </div>
             </div>

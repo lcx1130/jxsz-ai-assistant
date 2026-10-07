@@ -2,15 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { HumanForm } from "../lib/dify";
+import { isCancelAction } from "../lib/dify";
 
 export default function HumanInputForm({ form, workflowRunId, user, onResult }: {
   form: HumanForm; workflowRunId: string; user: string;
   onResult: (result: { answer?: string; humanForm?: HumanForm; workflowRunId?: string; status?: string }) => void;
 }) {
-  const awaitingStaff = form.awaitingStaff || !form.form_token || form.inputs?.some(input => input.output_variable_name !== "service_issue");
+  const awaitingStaff = form.awaitingStaff || !form.form_token;
   const onResultRef = useRef(onResult);
   onResultRef.current = onResult;
-  const [values, setValues] = useState<Record<string, string>>(form.resolved_default_values || {});
+  const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(form.inputs.map(input => [input.output_variable_name, form.resolved_default_values?.[input.output_variable_name] || ""])));
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -32,7 +33,7 @@ export default function HumanInputForm({ form, workflowRunId, user, onResult }: 
         if (!response.ok) throw new Error(result.error);
         if (stopped) return;
         setError("");
-        if (result.status !== "paused") { finished = true; onResultRef.current(result); }
+        if (result.status !== "paused" || (result.humanForm && !result.humanForm.awaitingStaff)) { finished = true; onResultRef.current(result); }
       } catch (e) {
         if (!stopped) setError(e instanceof Error ? e.message : "同步暂时中断，正在重试…");
       } finally {
@@ -72,7 +73,7 @@ export default function HumanInputForm({ form, workflowRunId, user, onResult }: 
   );
   return (
     <section className="human-input-card" aria-label={form.node_title || "人工服务表单"}>
-      <h3>{form.node_title || "人工服务表单"}</h3>
+      <h3>{form.node_title || (form.kind === "feedback" ? "问题与资料补充" : "人工服务表单")}</h3>
       <p className="human-form-description">{form.form_content.replace(/\{\{#\$output\.[^#]+#\}\}/g, "").trim()}</p>
       {submitted ? <p role="status">表单已提交。{busy ? "正在获取后续结果…" : "可检查流程的后续结果。"}</p> : (
         <>
@@ -83,14 +84,14 @@ export default function HumanInputForm({ form, workflowRunId, user, onResult }: 
                 onChange={event => setValues(previous => ({ ...previous, [input.output_variable_name]: event.target.value }))} />
             </label>
           ))}
-          {expired && <p role="alert">表单已过期，请新建对话后重新申请人工服务。</p>}
+          {expired && <p role="alert">表单已过期，请新建对话后重新打开表单。</p>}
           {!supported && <p role="alert">此表单包含暂不支持的字段，请在 Dify 中继续处理。</p>}
           {!form.form_token && <p role="status">此步骤需要由指定工作人员在 Dify 中处理。</p>}
         </>
       )}
       {error && <p className="error-box" role="alert">{error}</p>}
       {submitted ? <button className="button button-secondary" disabled={busy} onClick={() => submit("")}>检查后续结果</button> : (
-        <div className="human-form-actions">{form.actions?.map(action => <button key={action.id} className="button button-primary" disabled={busy || expired || !supported || !form.form_token || form.inputs.some(input => !values[input.output_variable_name]?.trim())} onClick={() => submit(action.id)}>{busy ? "提交中…" : action.title}</button>)}</div>
+        <div className="human-form-actions">{form.actions?.map(action => <button key={action.id} className="button button-primary" disabled={busy || expired || !supported || !form.form_token || (!isCancelAction(action) && form.kind !== "feedback" && form.inputs.some(input => !values[input.output_variable_name]?.trim()))} onClick={() => submit(action.id)}>{busy ? "处理中…" : action.title}</button>)}</div>
       )}
     </section>
   );

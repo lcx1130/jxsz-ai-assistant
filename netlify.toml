@@ -1,0 +1,6 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+# The current Netlify Next.js adapter is detected automatically.
+# Store Dify credentials in Netlify environment variables, never in this file.

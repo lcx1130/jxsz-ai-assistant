@@ -1,6 +1,6 @@
 import { sessionUser } from "../../../lib/server-session";
 import { NextRequest, NextResponse } from "next/server";
-import { difyConfig, readDifyStream } from "../../../lib/dify";
+import { difyConfig, readDifyStream, studentFormKind, isCancelAction, type HumanForm } from "../../../lib/dify";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -18,16 +18,23 @@ export async function POST(request: NextRequest) {
     if (typeof body.formToken !== "string" || !body.formToken || typeof body.action !== "string" || !body.inputs || typeof body.inputs !== "object" || Array.isArray(body.inputs)) {
       return NextResponse.json({ error: "请完整填写表单" }, { status: 400 });
     }
-    // Only the student issue form may be submitted from this public page.
+    // Only the student issue and feedback forms may be submitted publicly.
     // Staff approval forms remain in Dify/email, even for an old browser tab.
     const formUrl = `${base}/form/human_input/${encodeURIComponent(body.formToken)}`;
     const definition = await fetch(formUrl, { headers, cache: "no-store", signal: AbortSignal.timeout(15000) });
     if (!definition.ok) return NextResponse.json({ error: "表单不可用，可能已提交或过期。" }, { status: definition.status });
-    const form = await definition.json();
-    if (form.inputs?.length !== 1 || form.inputs[0].output_variable_name !== "service_issue") {
+    const form = await definition.json() as HumanForm;
+    if (!studentFormKind(form)) {
       return NextResponse.json({ error: "此表单由工作人员处理，请等待回复。" }, { status: 403 });
     }
-    if (typeof body.inputs.service_issue !== "string" || !body.inputs.service_issue.trim() || Object.keys(body.inputs).some(key => key !== "service_issue")) {
+    const action = (form.user_actions || form.actions || []).find(item => item.id === body.action);
+    if (!action) return NextResponse.json({ error: "此表单不支持该操作，请刷新后重试。" }, { status: 400 });
+    const fields = new Set(form.inputs.map(input => input.output_variable_name));
+    if (Object.keys(body.inputs).some(key => !fields.has(key)) || form.inputs.some(input => {
+      const value = body.inputs[input.output_variable_name];
+      return typeof value !== "string" || value.length > 10000;
+    })) return NextResponse.json({ error: "表单内容格式不正确或过长，请检查后重试。" }, { status: 400 });
+    if (studentFormKind(form) === "issue" && !isCancelAction(action) && !body.inputs.service_issue.trim()) {
       return NextResponse.json({ error: "请填写需要人工处理的问题。" }, { status: 400 });
     }
     const response = await fetch(formUrl, {

@@ -147,6 +147,15 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .message-bubble.user { background: var(--blue); color: #fff; border-radius: 16px; padding: 14px 18px; max-width: 480px; }
 .message-bubble.assistant { background: #fff; color: var(--slate-700); border: 1px solid var(--slate-200); border-radius: 16px; padding: 14px 18px; box-shadow: var(--shadow-sm); }
 .message-bubble.typing { color: var(--slate-500); }
+.chat-markdown { white-space: normal; overflow-wrap: anywhere; }
+.chat-markdown > :first-child { margin-top: 0; }
+.chat-markdown > :last-child { margin-bottom: 0; }
+.chat-markdown p { white-space: pre-wrap; }
+.chat-markdown a { color: var(--blue); text-decoration: underline; }
+.chat-markdown img { display: block; max-width: 100%; max-height: 560px; width: auto; height: auto; border-radius: 12px; margin: 12px 0; object-fit: contain; }
+.chat-markdown table { display: block; overflow-x: auto; border-collapse: collapse; max-width: 100%; }
+.chat-markdown th, .chat-markdown td { border: 1px solid var(--slate-200); padding: 8px 12px; }
+.chat-markdown pre { overflow-x: auto; white-space: pre; }
 .sources-card { background: var(--bg); border: 1px solid var(--slate-200); border-radius: 12px; padding: 14px; }
 .sources-title { color: var(--slate-600); font-size: 13px; display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
 .source-line { padding: 8px 4px; display: flex; justify-content: space-between; gap: 16px; font-size: 12px; color: var(--slate-500); border-top: 1px solid #edf2f7; }

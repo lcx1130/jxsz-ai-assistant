@@ -9,7 +9,7 @@ function load(path, context = {}) {
   vm.runInNewContext(code, { exports: module.exports, module, Response, TextDecoder, process, AbortSignal, encodeURIComponent, ...context });
   return module.exports;
 }
-const { readDifyStream, publicHumanForm } = load('lib/dify.ts');
+const { readDifyStream, publicHumanForm, studentFormKind, isCancelAction } = load('lib/dify.ts');
 function stream(events) {
   const bytes = new TextEncoder().encode(events.map(event => `data: ${JSON.stringify(event)}\r\n\r\n`).join(''));
   let pos = 0;
@@ -50,7 +50,7 @@ test('ordinary chat still preserves answer and knowledge sources', async () => {
 test('staff forms cannot be submitted via the student endpoint; polling only reads', async () => {
   const calls = [];
   const route = load('app/api/human/route.ts', {
-    require: name => name.includes('session') ? { sessionUser: async () => 'cookie-user' } : name === 'next/server' ? { NextResponse: Response } : { difyConfig: () => ({ base: 'https://test.invalid', headers: {} }), readDifyStream: async () => ({ status: 'succeeded', answer: '回复' }) },
+    require: name => name.includes('session') ? { sessionUser: async () => 'cookie-user' } : name === 'next/server' ? { NextResponse: Response } : { difyConfig: () => ({ base: 'https://test.invalid', headers: {} }), studentFormKind, isCancelAction, readDifyStream: async () => ({ status: 'succeeded', answer: '回复' }) },
     fetch: async (url, options) => { calls.push({ url, options }); return Response.json(staff); },
   });
   const denied = await route.POST({ json: async () => ({ user: 'u1', formToken: 'old-token', action: 'approve', inputs: { human_reply: '不能自行审批' } }) });
@@ -61,4 +61,35 @@ test('staff forms cannot be submitted via the student endpoint; polling only rea
   assert.equal((await resumed.json()).answer, '回复');
   assert.equal(calls[1].options.method, undefined);
   assert.match(calls[1].url, /user=cookie-user/);
+});
+
+const feedback = {
+  form_token: 'student-feedback-token', form_content: '问题与资料补充',
+  inputs: [{ output_variable_name: 'description', type: 'paragraph' }, { output_variable_name: 'source', type: 'paragraph' }],
+  user_actions: [{ id: 'SUBMIT_FEEDBACK', title: '提交反馈' }, { id: 'CANCEL', title: '取消' }],
+};
+test('feedback is a student form, including documented user_actions and nested run id', async () => {
+  const result = await readDifyStream(stream([
+    { event: 'human_input_required', data: { ...feedback, workflow_run_id: 'feedback-run' } },
+    { event: 'workflow_paused', data: { status: 'paused' } },
+  ]));
+  assert.equal(result.workflowRunId, 'feedback-run');
+  assert.equal(result.humanForm.kind, 'feedback');
+  assert.equal(result.humanForm.actions[1].id, 'CANCEL');
+});
+test('feedback with a staff reply field still does not expose the staff token', () => {
+  assert.equal(publicHumanForm({ ...feedback, inputs: [{ type: 'paragraph', output_variable_name: 'human_reply' }] }).form_token, undefined);
+});
+test('feedback cancellation accepts empty fields; forged actions and extra fields never submit', async () => {
+  const calls = [];
+  const route = load('app/api/human/route.ts', {
+    require: name => name.includes('session') ? { sessionUser: async () => 'cookie-user' } : name === 'next/server' ? { NextResponse: Response } : { difyConfig: () => ({ base: 'https://test.invalid', headers: {} }), studentFormKind, isCancelAction, readDifyStream },
+    fetch: async (url, options) => { calls.push(options); return Response.json(options.method === 'POST' ? {} : feedback); },
+  });
+  const request = (action, inputs) => ({ json: async () => ({ formToken: 'student-token', action, inputs }) });
+  assert.equal((await route.POST(request('CANCEL', { description: '', source: '' }))).status, 200);
+  assert.equal(JSON.parse(calls[1].body).user, 'cookie-user');
+  assert.equal((await route.POST(request('approve', { description: 'test', source: '' }))).status, 400);
+  assert.equal((await route.POST(request('SUBMIT_FEEDBACK', { description: 'test', source: '', human_reply: 'forged' }))).status, 400);
+  assert.equal(calls.filter(call => call.method === 'POST').length, 1);
 });

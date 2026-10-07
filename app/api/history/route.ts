@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       const humanForm = pending?.form_definition ? publicHumanForm(pending.form_definition) : undefined;
       return [
       { id: `${item.id}-user`, role: "user", content: item.query },
-      { id: item.id, messageId: item.id, role: "assistant", content: item.answer || (humanForm?.awaitingStaff ? "问题已提交，正在等待工作人员回复。" : humanForm ? "请填写下方人工服务表单。" : "此条消息尚无回复。"), workflowRunId: pending?.workflow_run_id || item.workflow_run_id, humanForm, status: item.status === "paused" ? "paused" : "succeeded",
+      { id: item.id, messageId: item.id, role: "assistant", content: item.answer || (humanForm?.awaitingStaff ? "问题已提交，正在等待工作人员回复。" : humanForm ? "请填写下方表单，或选择取消。" : "此条消息尚无回复。"), workflowRunId: pending?.workflow_run_id || item.workflow_run_id, humanForm, status: item.status === "paused" ? "paused" : "succeeded",
         sources: (item.retriever_resources || []).map(source => ({ datasetName: source.dataset_name, documentName: source.document_name, content: source.content, score: source.score })) },
     ]; });
     return NextResponse.json({ messages, hasMore: !!result.has_more, cursor: rows[0]?.id }, { headers: { "Cache-Control": "no-store" } });
