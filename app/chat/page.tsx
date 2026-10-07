@@ -10,6 +10,7 @@ import { Suspense, FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Header from "../../components/Header";
 import ChatMarkdown from "../../components/ChatMarkdown";
+import RunProgress from "../../components/RunProgress";
 
 type Source = {
   datasetName?: string;
@@ -41,6 +42,7 @@ function ChatContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const pendingHuman = messages.some(message => message.status === "paused");
+  const pendingRun = messages.some(message => message.status === "running");
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -83,7 +85,7 @@ function ChatContent() {
 
   async function sendMessage(question?: string) {
     const query = (question ?? input).trim();
-    if (!query || loading || historyLoading || pendingHuman) return;
+    if (!query || loading || historyLoading || pendingHuman || pendingRun) return;
 
     setError("");
     setLoading(true);
@@ -111,7 +113,7 @@ function ChatContent() {
           id: data.messageId || crypto.randomUUID(),
           messageId: data.messageId,
           role: "assistant",
-          content: data.answer || (data.humanForm?.awaitingStaff ? "问题已提交，正在等待工作人员回复。" : data.humanForm ? "请填写下方表单，或选择取消。" : data.status === "paused" ? "流程正在等待人工处理。" : "本次流程已结束，但未提供回复，请重新提问。"),
+          content: data.answer || (data.status === "running" ? "正在整理查询结果…" : data.humanForm?.awaitingStaff ? "问题已提交，正在等待工作人员回复。" : data.humanForm ? "请填写下方表单，或选择取消。" : data.status === "paused" ? "流程正在等待人工处理。" : "本次流程已结束，但未提供回复，请重新提问。"),
           humanForm: data.humanForm,
           workflowRunId: data.workflowRunId,
           status: data.status,
@@ -158,12 +160,12 @@ function ChatContent() {
             <button
               type="button"
               className="button button-secondary"
-              disabled={loading || historyLoading || pendingHuman}
+              disabled={loading || historyLoading || pendingHuman || pendingRun}
               onClick={() => sendMessage("提交反馈")}
             >
               提交反馈
             </button>
-            <button type="button" className="button button-human" disabled={loading || historyLoading || pendingHuman} onClick={() => sendMessage("人工客服")}><Icon name="headset" size={18} />{pendingHuman ? "等待人工流程处理" : "我要人工客服"}</button>
+            <button type="button" className="button button-human" disabled={loading || historyLoading || pendingHuman || pendingRun} onClick={() => sendMessage("人工客服")}><Icon name="headset" size={18} />{pendingHuman ? "等待人工流程处理" : "我要人工客服"}</button>
             <button type="button" className="button button-secondary" disabled={loading || historyLoading} onClick={newConversation}>新建对话</button>
           </div>
 
@@ -187,10 +189,16 @@ function ChatContent() {
                 {message.role === "assistant" && <SchoolEmblem small />}
                 <div className="message-stack">
                   <div className={`message-bubble ${message.role}`}>{message.role === "assistant" ? <ChatMarkdown content={message.content} /> : message.content}</div>
+                  {message.status === "running" && message.workflowRunId && (
+                    <RunProgress workflowRunId={message.workflowRunId} onResult={result => setMessages(previous => previous.map(item => item.id === message.id ? {
+                      ...item, content: result.answer || (result.humanForm ? "请完成下方表单，或选择取消。" : result.status === "paused" ? "流程正在等待人工处理。" : "查询已结束，未取得有效资料。"),
+                      humanForm: result.humanForm, workflowRunId: result.workflowRunId || item.workflowRunId, status: result.status, sources: result.sources || [],
+                    } : item))} />
+                  )}
                   {message.humanForm && message.workflowRunId && (
                     <HumanInputForm key={message.humanForm.form_token || message.id} form={message.humanForm} workflowRunId={message.workflowRunId} user={makeUserId()}
                       onResult={(result) => setMessages(previous => previous.map(item => item.id === message.id ? {
-                        ...item, content: result.answer || (result.humanForm?.awaitingStaff ? "问题已提交，正在等待工作人员回复。" : result.humanForm ? "请继续完成下方步骤。" : result.status === "paused" ? "问题已提交，流程正在等待人工处理。" : "人工流程已结束，但未返回回复内容。请联系工作人员检查处理结果。"),
+                        ...item, content: result.answer || (result.status === "running" ? "正在获取处理结果…" : result.humanForm?.awaitingStaff ? "问题已提交，正在等待工作人员回复。" : result.humanForm ? "请继续完成下方步骤。" : result.status === "paused" ? "问题已提交，流程正在等待人工处理。" : "人工流程已结束，但未返回回复内容。请联系工作人员检查处理结果。"),
                         humanForm: result.humanForm, workflowRunId: result.workflowRunId || item.workflowRunId, status: result.status,
                       } : item))} />
                   )}
@@ -205,7 +213,7 @@ function ChatContent() {
                       ))}
                     </div>
                   )}
-                  {message.role === "assistant" && message.status !== "paused" && (
+                  {message.role === "assistant" && message.status !== "paused" && message.status !== "running" && (
                     <div className="feedback-row">
                       <span>这个回答对你有帮助吗？</span>
                       <button className="feedback good">有帮助</button>
@@ -237,13 +245,13 @@ function ChatContent() {
                     sendMessage();
                   }
                 }}
-                disabled={pendingHuman}
-                placeholder={pendingHuman ? "请先完成上方表单，或新建对话继续咨询" : "输入你的校园问题…"}
+                disabled={pendingHuman || pendingRun}
+                placeholder={pendingRun ? "正在查询资料，请稍候…" : pendingHuman ? "请先完成上方表单，或新建对话继续咨询" : "输入你的校园问题…"}
                 rows={2}
               />
               <div className="composer-bottom">
                 <span className="soft-pill">重要信息请核对来源和日期</span>
-                <button className="button button-primary" disabled={loading || historyLoading || pendingHuman || !input.trim()} type="submit"><Icon name="send" size={18} />发送</button>
+                <button className="button button-primary" disabled={loading || historyLoading || pendingHuman || pendingRun || !input.trim()} type="submit"><Icon name="send" size={18} />发送</button>
               </div>
             </div>
             <p>AI 可能出现错误，重要信息请以学校官方最新通知为准。</p>

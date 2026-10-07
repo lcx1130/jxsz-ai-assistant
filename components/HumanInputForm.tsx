@@ -79,7 +79,12 @@ export default function HumanInputForm({ form, workflowRunId, user, onResult }: 
         <>
           {form.inputs?.map(input => input.type === "paragraph" && (
             <label className="human-field" key={input.output_variable_name}>
-              {input.output_variable_name === "service_issue" ? "请描述你遇到的问题" : input.output_variable_name}
+              {{
+                service_issue: "请描述你遇到的问题",
+                feedback_question: "反馈的问题",
+                feedback_content: "补充内容（选填）",
+                feedback_source: "资料来源（选填）",
+              }[input.output_variable_name] || "补充说明"}
               <textarea rows={4} value={values[input.output_variable_name] || ""} disabled={busy || expired}
                 onChange={event => setValues(previous => ({ ...previous, [input.output_variable_name]: event.target.value }))} />
             </label>

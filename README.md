@@ -57,6 +57,14 @@ npm run dev
 - 当前不支持 select、file 等字段；如果以后扩展 Dify 表单类型，需要同步更新前端。
 - “有帮助 / 没帮助”目前仍是展示按钮，尚未接入评价保存。
 
+## 耗时较长的查询
+
+Netlify 的同步请求有 60 秒上限。网页在单次等待接近上限前，保留 Dify 的流程编号，随后通过 `/workflow/{id}/events` 自动读取同一次查询的后续结果；不会重复发送原问题，也不会重新提交反馈。
+
+页面保持“正在查询”的状态，完成后显示回答；临时断连会继续获取结果。连续等待超过十分钟时可点击“继续等待”。后端密钥仍仅在服务器使用，读取流程时始终使用签名访客身份。
+
+参考：[Netlify 执行限制](https://docs.netlify.com/build/functions/configuration/)；[Dify 流程事件](https://docs.dify.ai/en/api-reference/workflow-runs/stream-workflow-events)。
+
 ## 校园图片
 
 图片位于 `public/images/campus-images/`。工具返回 Markdown 图片链接，网页显示为图片并可点开查看。

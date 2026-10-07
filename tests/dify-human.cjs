@@ -6,7 +6,7 @@ const ts = require('typescript');
 function load(path, context = {}) {
   const module = { exports: {} };
   const code = ts.transpileModule(fs.readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  vm.runInNewContext(code, { exports: module.exports, module, Response, TextDecoder, process, AbortSignal, encodeURIComponent, ...context });
+  vm.runInNewContext(code, { exports: module.exports, module, Response, TextDecoder, process, AbortSignal, encodeURIComponent, setTimeout, clearTimeout, ...context });
   return module.exports;
 }
 const { readDifyStream, publicHumanForm, studentFormKind, isCancelAction } = load('lib/dify.ts');
@@ -46,6 +46,26 @@ test('ordinary chat still preserves answer and knowledge sources', async () => {
   assert.equal(result.answer, '四人寝');
   assert.equal(result.sources.length, 1);
   assert.equal(result.conversationId, 'c1');
+});
+test('slow run returns a reconnectable checkpoint before the hosting deadline, then recovers its final answer', async () => {
+  let cancelled = false;
+  const response = new Response(new ReadableStream({
+    start(controller) { controller.enqueue(new TextEncoder().encode('data: {"event":"workflow_started","conversation_id":"conversation-1","data":{"id":"slow-run"}}\n\ndata: {"event":"message","answer":"unfinished draft"}\n\n')); },
+    cancel() { cancelled = true; },
+  }), { headers: { 'Content-Type': 'text/event-stream' } });
+  const pending = await readDifyStream(response, { maxWaitMs: 5 });
+  assert.equal(pending.status, 'running');
+  assert.equal(pending.workflowRunId, 'slow-run');
+  assert.equal(pending.conversationId, 'conversation-1');
+  assert.equal(pending.answer, '');
+  assert.equal(cancelled, true);
+  const resumed = await readDifyStream(stream([{ event: 'workflow_finished', workflow_run_id: 'slow-run', data: { status: 'succeeded', outputs: { answer: 'final answer with sources' } } }]), { maxWaitMs: 5 });
+  assert.equal(resumed.status, 'succeeded');
+  assert.equal(resumed.answer, 'final answer with sources');
+});
+test('an interrupted stream without a run id is never reported as a resumable success', async () => {
+  const response = new Response(new ReadableStream({ start() {} }), { headers: { 'Content-Type': 'text/event-stream' } });
+  await assert.rejects(readDifyStream(response, { maxWaitMs: 5 }), /连接中断/);
 });
 test('staff forms cannot be submitted via the student endpoint; polling only reads', async () => {
   const calls = [];

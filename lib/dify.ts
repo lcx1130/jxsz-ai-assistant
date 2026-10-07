@@ -49,7 +49,7 @@ export function difyConfig() {
 }
 
 // Consume only public answer/form events. Never send internal node traces to the browser.
-export async function readDifyStream(response: Response) {
+export async function readDifyStream(response: Response, options: { maxWaitMs?: number } = {}) {
   if (!response.ok) throw new Error(`Dify 请求失败（${response.status}），请稍后重试。`);
   if (!response.body || !response.headers.get("content-type")?.includes("text/event-stream")) {
     throw new Error("Dify 未返回预期的事件流，请检查应用配置。");
@@ -63,6 +63,7 @@ export async function readDifyStream(response: Response) {
     result.conversationId = event.conversation_id || result.conversationId;
     result.messageId = event.message_id || result.messageId;
     result.workflowRunId = event.workflow_run_id || (event.data as { workflow_run_id?: string })?.workflow_run_id || result.workflowRunId;
+    if (event.event === "workflow_started" && !result.workflowRunId) result.workflowRunId = (event.data as { id?: string })?.id || "";
     if (event.event === "error") throw new Error("Dify 流程执行失败，请稍后重试。");
     if (event.event === "message" || event.event === "agent_message") result.answer += event.answer || "";
     if (event.event === "text_chunk") textChunks += event.data?.text || "";
@@ -90,9 +91,15 @@ export async function readDifyStream(response: Response) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = options.maxWaitMs ? new Promise<null>(resolve => {
+    timer = setTimeout(() => resolve(null), options.maxWaitMs);
+  }) : null;
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      const chunk = deadline ? await Promise.race([reader.read(), deadline]) : await reader.read();
+      if (!chunk) { await reader.cancel(); break; }
+      const { done, value } = chunk;
       buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
       buffer = buffer.replace(/\r\n/g, "\n");
       let end;
@@ -103,11 +110,19 @@ export async function readDifyStream(response: Response) {
       if (done) { if (buffer.trim()) consume(buffer); break; }
       if (result.status === "paused") { await reader.cancel(); break; }
     }
-  } finally { reader.releaseLock(); }
+  } finally { if (timer) clearTimeout(timer); reader.releaseLock(); }
   if (result.humanForm) {
     result.humanForm = publicHumanForm(result.humanForm);
     result.status = "paused";
   }
-  if (result.status === "running") throw new Error("连接中断，尚未收到完整结果，请重试。");
+  if (result.status === "running") {
+    if (options.maxWaitMs && result.workflowRunId) {
+      // Reconnect to this run, never submit the query again. Dify's events API
+      // supports in-progress runs and replays the final answer after completion.
+      result.answer = "";
+      return result;
+    }
+    throw new Error("连接中断，尚未收到完整结果，请重试。");
+  }
   return result;
 }
