@@ -16,9 +16,9 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${base}/chat-messages`, {
       method: "POST", headers,
       body: JSON.stringify({ inputs: {}, query, response_mode: "streaming", user, ...(conversationId ? { conversation_id: conversationId } : {}) }),
-      cache: "no-store", signal: AbortSignal.timeout(50000),
+      cache: "no-store", signal: AbortSignal.timeout(25000),
     });
-    const result = await readDifyStream(response, { maxWaitMs: 35000 });
+    const result = await readDifyStream(response, { maxWaitMs: 15000 });
     return NextResponse.json({ ...result, conversationId: result.conversationId || conversationId });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "服务暂不可用" }, { status: 502 });

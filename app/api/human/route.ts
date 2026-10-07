@@ -12,8 +12,8 @@ export async function POST(request: NextRequest) {
     const { base, headers } = difyConfig();
     if (body.operation === "resume") {
       if (typeof body.workflowRunId !== "string" || !body.workflowRunId) return NextResponse.json({ error: "缺少流程编号" }, { status: 400 });
-      const response = await fetch(`${base}/workflow/${encodeURIComponent(body.workflowRunId)}/events?user=${encodeURIComponent(user)}&include_state_snapshot=true`, { headers, cache: "no-store", signal: AbortSignal.timeout(50000) });
-      return NextResponse.json(await readDifyStream(response, { maxWaitMs: 25000 }));
+      const response = await fetch(`${base}/workflow/${encodeURIComponent(body.workflowRunId)}/events?user=${encodeURIComponent(user)}&include_state_snapshot=true`, { headers, cache: "no-store", signal: AbortSignal.timeout(25000) });
+      return NextResponse.json(await readDifyStream(response, { maxWaitMs: 15000 }));
     }
     if (typeof body.formToken !== "string" || !body.formToken || typeof body.action !== "string" || !body.inputs || typeof body.inputs !== "object" || Array.isArray(body.inputs)) {
       return NextResponse.json({ error: "请完整填写表单" }, { status: 400 });
